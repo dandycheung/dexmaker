@@ -18,6 +18,7 @@ package com.android.dx.mockito.inline;
 
 import android.util.Log;
 
+import org.mockito.exceptions.base.MockitoException;
 import org.mockito.invocation.MockHandler;
 import org.mockito.mock.MockCreationSettings;
 import org.mockito.plugins.InlineMockMaker;
@@ -102,7 +103,17 @@ public final class MockMakerMultiplexer implements InlineMockMaker {
             }
         }
 
-        return null;
+        return new TypeMockability() {
+            @Override
+            public boolean mockable() {
+                return false;
+            }
+
+            @Override
+            public String nonMockableReason() {
+                return "No mock makers available to mock this type";
+            }
+        };
     }
 
     @Override
@@ -127,5 +138,19 @@ public final class MockMakerMultiplexer implements InlineMockMaker {
             InlineMockMaker inlineMockMaker = (InlineMockMaker) mockMaker;
             inlineMockMaker.clearAllMocks();
         }
+    }
+
+    @Override
+    public <T> SingletonMockControl<T> createSingletonMock(
+            T instance, MockCreationSettings<T> settings, MockHandler handler) {
+        for (MockMaker mockMaker : MOCK_MAKERS) {
+            try {
+                return mockMaker.createSingletonMock(instance, settings, handler);
+            } catch (MockitoException ignored) {
+            }
+        }
+        throw new MockitoException(
+                "The used MockMaker MockMakerMultiplexer does not support the creation of "
+                + "singleton mocks\n\nEnsure your MockMaker implementation supports this feature.");
     }
 }
